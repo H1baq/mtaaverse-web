@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes, viewport-fit=cover">
+  <meta name="theme-color" content="#120d24">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>MTAAVERSE</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #120d24;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #fff;
+      touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+    #unity-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; background: #120d24; outline: none; }
+    #loader { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: #120d24; z-index: 2; }
+    #loader h1 { margin: 0; font-size: 34px; letter-spacing: 4px; font-weight: 900;
+      background: linear-gradient(90deg, #ffd23f, #ff5ea8, #7b5cff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    #loader p { margin: 0; opacity: .7; font-size: 14px; text-align: center; padding: 0 24px; }
+    #bar { width: min(320px, 70vw); height: 10px; border-radius: 6px; background: rgba(255,255,255,.12); overflow: hidden; }
+    #fill { width: 0; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #ffd23f, #ff5ea8); transition: width .2s; }
+    #fs { position: fixed; right: max(10px, env(safe-area-inset-right)); top: max(10px, env(safe-area-inset-top)); z-index: 3;
+      border: 0; border-radius: 10px; padding: 8px 12px; font-size: 13px; font-weight: 700; color: #fff; background: rgba(0,0,0,.45); display: none; }
+    #rotate { position: fixed; inset: 0; z-index: 4; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+      background: rgba(18,13,36,.96); text-align: center; padding: 24px; }
+    #rotate .phone { width: 46px; height: 78px; border: 4px solid #ffd23f; border-radius: 10px; animation: turn 1.8s ease-in-out infinite; }
+    @keyframes turn { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+    @media (orientation: portrait) and (pointer: coarse) { #rotate.on { display: flex; } }
+    #err { position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 5; display: none; padding: 12px; border-radius: 10px; background: #b3261e; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <canvas id="unity-canvas" tabindex="-1"></canvas>
+  <div id="loader">
+    <h1>MTAAVERSE</h1>
+    <div id="bar"><div id="fill"></div></div>
+    <p id="status">Loading the city…</p>
+    <p style="font-size:11px;opacity:.45">Concept prototype · not an official Safaricom product · social features are simulated</p>
+  </div>
+  <button id="fs" type="button">⛶ Fullscreen</button>
+  <div id="rotate"><div class="phone"></div><b>Turn your phone sideways</b><span style="opacity:.7;font-size:13px">MTAAVERSE plays in landscape.</span>
+    <button type="button" id="rotate-go" style="margin-top:8px;border:0;border-radius:10px;padding:10px 16px;font-weight:700;background:#ffd23f;color:#120d24">Go fullscreen</button></div>
+  <div id="err"></div>
+  <script>
+    var canvas = document.getElementById("unity-canvas");
+    var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform));
+    var buildUrl = "Build";
+    var config = {
+      arguments: [],
+      dataUrl: buildUrl + "/WebGL.data.unityweb",
+      frameworkUrl: buildUrl + "/WebGL.framework.js.unityweb",
+      codeUrl: buildUrl + "/WebGL.wasm.unityweb",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "MtaaverseConcept",
+      productName: "MTAAVERSE",
+      productVersion: "0.1.0",
+      showBanner: function (msg, type) { if (type === "error") showError(msg); else console.warn(msg); },
+    };
+    // Phones have 3x screens; rendering at full density would cost far more GPU than it looks worth.
+    if (isMobile) config.devicePixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+
+    function showError(msg) { var e = document.getElementById("err"); e.textContent = msg; e.style.display = "block"; }
+    function goFullscreen() {
+      var el = document.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen;
+      if (!req) return;
+      Promise.resolve(req.call(el)).then(function () {
+        if (screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").catch(function () {});
+      }).catch(function () {});
+    }
+    var canFullscreen = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+    var fs = document.getElementById("fs");
+    if (canFullscreen) { fs.onclick = goFullscreen; } else { document.getElementById("rotate-go").style.display = "none"; }
+    document.getElementById("rotate-go").onclick = goFullscreen;
+    document.addEventListener("fullscreenchange", function () { fs.style.display = document.fullscreenElement || !canFullscreen ? "none" : "block"; });
+
+    var script = document.createElement("script");
+    script.src = buildUrl + "/WebGL.loader.js";
+    script.onload = function () {
+      createUnityInstance(canvas, config, function (p) {
+        document.getElementById("fill").style.width = Math.round(p * 100) + "%";
+        if (p >= 0.9) document.getElementById("status").textContent = "Building the world…";
+      }).then(function () {
+        document.getElementById("loader").style.display = "none";
+        if (isMobile) { document.getElementById("rotate").classList.add("on"); if (canFullscreen) fs.style.display = "block"; }
+      }).catch(function (message) { showError(String(message)); });
+    };
+    script.onerror = function () { showError("Could not load the game files. If you opened index.html directly, serve the folder over http instead."); };
+    document.body.appendChild(script);
+  </script>
+</body>
+</html>
